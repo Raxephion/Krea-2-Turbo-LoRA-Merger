@@ -30,6 +30,88 @@ MAX_LORAS = 8
 COMPUTE_DTYPES = ["fp32", "fp16", "bf16"]
 OUTPUT_DTYPES = list(DTYPE_MAP.keys())
 
+CYBERPUNK_CSS = """
+/* --- CYBERPUNK HUD STYLES --- */
+:root {
+    --neon-blue: #00ffff;
+    --neon-glow: 0 0 8px #00ffff, 0 0 16px #00ffff;
+    --bg-black: #000000;
+}
+/* GLOBAL BACKGROUND */
+body, .gradio-container {
+    background: var(--bg-black) !important;
+    color: var(--neon-blue) !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+/* MAIN TITLE */
+#main_title {
+    color: var(--neon-blue) !important;
+    text-shadow: var(--neon-glow);
+    text-align: center;
+    font-size: 3em !important;
+    border-bottom: 1px solid var(--neon-blue);
+    padding-bottom: 8px;
+}
+/* TEXTBOXES */
+textarea, input[type="text"], .gr-textbox, .gr-input {
+    background: var(--bg-black) !important;
+    border: 1px solid var(--neon-blue) !important;
+    color: var(--neon-blue) !important;
+    text-shadow: var(--neon-glow);
+    font-family: 'Share Tech Mono', monospace !important;
+    border-radius: 0 !important;
+    box-shadow: inset 0 0 12px #003333;
+}
+/* OUTPUT + INPUT TEXTAREAS */
+#danika_output textarea, #user_input textarea {
+    background: var(--bg-black) !important;
+    color: var(--neon-blue) !important;
+    border: 1px solid var(--neon-blue) !important;
+    text-shadow: var(--neon-glow);
+    font-size: 15px !important;
+    box-shadow: inset 0 0 20px #002222;
+}
+/* BUTTONS */
+button, .gr-button {
+    background: var(--bg-black) !important;
+    border: 1px solid var(--neon-blue) !important;
+    color: var(--neon-blue) !important;
+    text-shadow: var(--neon-glow);
+    border-radius: 0 !important;
+    transition: all 0.2s ease-in-out;
+}
+button:hover, .gr-button:hover {
+    background: var(--neon-blue) !important;
+    color: var(--bg-black) !important;
+    text-shadow: none !important;
+    box-shadow: 0 0 20px #00ffff;
+}
+/* ACCORDIONS & BOXES */
+.gr-accordion, .gr-box {
+    background: var(--bg-black) !important;
+    border: 1px solid var(--neon-blue) !important;
+    color: var(--neon-blue) !important;
+    text-shadow: var(--neon-glow);
+    border-radius: 0 !important;
+}
+/* SLIDERS */
+input[type=range]::-webkit-slider-thumb {
+    background: var(--neon-blue) !important;
+    box-shadow: var(--neon-glow);
+}
+input[type=range]::-webkit-slider-runnable-track {
+    background: #003333 !important;
+    border: 1px solid var(--neon-blue);
+}
+/* LABELS */
+h3, label, .gr-checkbox label span {
+    color: var(--neon-blue) !important;
+    text-shadow: var(--neon-glow);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+"""
+
 
 # --------------------------------------------------------------------------- #
 # UI callbacks
@@ -167,7 +249,8 @@ with gr.Blocks(title="Krea 2 Turbo LoRA Merger") as demo:
     gr.Markdown(
         "# Krea 2 Turbo LoRA Merger\n"
         "Permanently bake one or more LoRAs into a base checkpoint. "
-        "Fully offline — nothing here calls the internet."
+        "Fully offline — nothing here calls the internet.",
+        elem_id="main_title",
     )
 
     with gr.Row():
@@ -224,4 +307,8 @@ with gr.Blocks(title="Krea 2 Turbo LoRA Merger") as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch(inbrowser=True)
+    try:
+        demo.launch(inbrowser=True, css=CYBERPUNK_CSS)
+    except TypeError:
+        # Older Gradio versions (<6.0) don't accept css in launch(); fall back.
+        demo.launch(inbrowser=True)
