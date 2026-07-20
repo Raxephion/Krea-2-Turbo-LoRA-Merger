@@ -2,7 +2,7 @@
 
 A standalone, offline Gradio app that permanently merges one or more LoRA
 files into a base diffusion model checkpoint (built for Krea 2 Turbo, but
-works with any safetensors checkpoint using compatible LoRA naming).
+works with any safetensors checkpoint using compatible LoRA naming). Utilises CPU or GPU for fast merging.
 
 !!! APP IS IN BETA!!!
 
