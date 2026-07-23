@@ -1,10 +1,11 @@
 # Krea 2 Turbo LoRA Merger
 
-> ⚠️ **Note:** key-matching between diffusers-format LoRAs and native/AI-Toolkit
-> fp8-scaled base checkpoints has been fixed and verified against real files,
-> including fp8 dequantize/requantize handling. If you hit a 0-match report
-> on a different LoRA/base combination, please open an issue with a
-> `check_keys_full.py` dump of both files.
+> ⚠️ **Known issue — do not use merged output yet.** Key-matching against
+> fp8-scaled Krea 2 checkpoints is now verified correct (232/232 layers
+> matched), but merged models currently produce pure noise output at
+> inference. This points to the fp8 dequantize/requantize math, not the key
+> matching. Actively being debugged — please hold off relying on merged
+> files until this note is removed. Follow/open an issue for updates.
 
 
 A standalone, offline Gradio app that permanently merges one or more LoRA
