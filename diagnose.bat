@@ -6,7 +6,7 @@ REM EDIT THESE TWO LINES ONLY if the paths are wrong, then save
 REM and double-click this file.
 REM ============================================================
 set BASE_PATH=C:\ComfyFAST\ComfyUI_windows_portable\ComfyUI\models\diffusion_models\krea2_turbo_base_fp8_scaled.safetensors
-set LORA_PATH=C:\ComfyFAST\ComfyUI_windows_portable\ComfyUI\models\loras\Krea2_Danika_Ultra_Steps1500.safetensors
+
 
 call .venv\Scripts\activate.bat
 
