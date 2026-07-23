@@ -162,11 +162,13 @@ def extract_lora_pairs(lora_state: dict[str, torch.Tensor]) -> dict[str, dict]:
 #   transformer.text_fusion.projector           txtfusion.projector
 #   transformer.img_in                          first
 #   transformer.final_layer.linear              last.linear
-#   transformer.time_embed.linear_1/2           tmlp.0 / tmlp.1
-#   transformer.txt_in.linear_1/2               txtmlp.0 / txtmlp.1
-#   transformer.time_mod_proj                   tproj.1   (lower confidence --
-#                                                 single tensor, low impact if
-#                                                 wrong; reported either way)
+#   transformer.time_embed.linear_1/2           tmlp.0 / tmlp.2   (index 1
+#                                                 unused in the base; confirmed
+#                                                 via exact key dump)
+#   transformer.txt_in.linear_1/2               txtmlp.1 / txtmlp.3  (index 0
+#                                                 is a norm scale, not a linear;
+#                                                 confirmed via exact key dump)
+#   transformer.time_mod_proj                    tproj.1   (confirmed correct)
 #
 #   attn.to_q / to_k / to_v / to_gate           attn.wq / wk / wv / gate
 #   attn.to_out.0                               attn.wo
@@ -180,9 +182,9 @@ _TOP_LEVEL_RENAMES = [
     (re.compile(r"^transformer\.img_in$"), "first"),
     (re.compile(r"^transformer\.final_layer\.linear$"), "last.linear"),
     (re.compile(r"^transformer\.time_embed\.linear_1$"), "tmlp.0"),
-    (re.compile(r"^transformer\.time_embed\.linear_2$"), "tmlp.1"),
-    (re.compile(r"^transformer\.txt_in\.linear_1$"), "txtmlp.0"),
-    (re.compile(r"^transformer\.txt_in\.linear_2$"), "txtmlp.1"),
+    (re.compile(r"^transformer\.time_embed\.linear_2$"), "tmlp.2"),
+    (re.compile(r"^transformer\.txt_in\.linear_1$"), "txtmlp.1"),
+    (re.compile(r"^transformer\.txt_in\.linear_2$"), "txtmlp.3"),
     (re.compile(r"^transformer\.time_mod_proj$"), "tproj.1"),
 ]
 
