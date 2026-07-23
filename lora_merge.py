@@ -146,8 +146,86 @@ def extract_lora_pairs(lora_state: dict[str, torch.Tensor]) -> dict[str, dict]:
 
 
 # --------------------------------------------------------------------------- #
-# Matching LoRA base names to base-model state dict keys
+# Krea 2 specific: diffusers-style -> native/AI-Toolkit-style key translation
 # --------------------------------------------------------------------------- #
+#
+# Verified directly against a real Krea 2 Turbo fp8-scaled checkpoint and a
+# diffusers-format LoRA (both key skeletons dumped and cross-checked -- block
+# counts, sub-module names, and component names all line up 1:1). This is an
+# explicit rule table, not a guess:
+#
+#   diffusers (LoRA)                          native (base checkpoint)
+#   -----------------------------------------  -------------------------------
+#   transformer.transformer_blocks.N.*         blocks.N.*
+#   transformer.text_fusion.layerwise_blocks.N  txtfusion.layerwise_blocks.N
+#   transformer.text_fusion.refiner_blocks.N    txtfusion.refiner_blocks.N
+#   transformer.text_fusion.projector           txtfusion.projector
+#   transformer.img_in                          first
+#   transformer.final_layer.linear              last.linear
+#   transformer.time_embed.linear_1/2           tmlp.0 / tmlp.1
+#   transformer.txt_in.linear_1/2               txtmlp.0 / txtmlp.1
+#   transformer.time_mod_proj                   tproj.1   (lower confidence --
+#                                                 single tensor, low impact if
+#                                                 wrong; reported either way)
+#
+#   attn.to_q / to_k / to_v / to_gate           attn.wq / wk / wv / gate
+#   attn.to_out.0                               attn.wo
+#   ff.up / ff.down                             mlp.up / mlp.down
+
+_TOP_LEVEL_RENAMES = [
+    (re.compile(r"^transformer\.transformer_blocks\.(\d+)\."), r"blocks.\1."),
+    (re.compile(r"^transformer\.text_fusion\.layerwise_blocks\.(\d+)\."), r"txtfusion.layerwise_blocks.\1."),
+    (re.compile(r"^transformer\.text_fusion\.refiner_blocks\.(\d+)\."), r"txtfusion.refiner_blocks.\1."),
+    (re.compile(r"^transformer\.text_fusion\.projector$"), "txtfusion.projector"),
+    (re.compile(r"^transformer\.img_in$"), "first"),
+    (re.compile(r"^transformer\.final_layer\.linear$"), "last.linear"),
+    (re.compile(r"^transformer\.time_embed\.linear_1$"), "tmlp.0"),
+    (re.compile(r"^transformer\.time_embed\.linear_2$"), "tmlp.1"),
+    (re.compile(r"^transformer\.txt_in\.linear_1$"), "txtmlp.0"),
+    (re.compile(r"^transformer\.txt_in\.linear_2$"), "txtmlp.1"),
+    (re.compile(r"^transformer\.time_mod_proj$"), "tproj.1"),
+]
+
+_COMPONENT_RENAMES = [
+    (re.compile(r"\.attn\.to_out\.0$"), ".attn.wo"),
+    (re.compile(r"\.attn\.to_q$"), ".attn.wq"),
+    (re.compile(r"\.attn\.to_k$"), ".attn.wk"),
+    (re.compile(r"\.attn\.to_v$"), ".attn.wv"),
+    (re.compile(r"\.attn\.to_gate$"), ".attn.gate"),
+    (re.compile(r"\.ff\.up$"), ".mlp.up"),
+    (re.compile(r"\.ff\.down$"), ".mlp.down"),
+]
+
+
+def diffusers_to_native(base_name: str) -> str | None:
+    """
+    Translate a diffusers-style Krea 2 LoRA base name into the native/
+    AI-Toolkit-style name used by this project's base checkpoints.
+    Returns None if base_name doesn't match a known diffusers-style pattern
+    (caller should fall back to fuzzy matching in that case).
+    """
+    if not base_name.startswith("transformer."):
+        return None
+
+    translated = base_name
+    matched_top = False
+    for pattern, repl in _TOP_LEVEL_RENAMES:
+        new = pattern.sub(repl, translated)
+        if new != translated:
+            translated = new
+            matched_top = True
+            break
+
+    if not matched_top:
+        return None
+
+    for pattern, repl in _COMPONENT_RENAMES:
+        translated = pattern.sub(repl, translated)
+
+    return translated
+
+
+
 
 def build_base_lookup(base_state: dict[str, torch.Tensor]) -> dict[str, str]:
     """normalized_key -> original base_state key, for weight tensors only."""
@@ -175,6 +253,12 @@ def match_layers(
 
         candidate = base_name + ".weight"
         base_key = candidate if candidate in base_state else None
+
+        if base_key is None:
+            translated = diffusers_to_native(base_name)
+            if translated is not None:
+                candidate2 = translated + ".weight"
+                base_key = candidate2 if candidate2 in base_state else None
 
         if base_key is None:
             norm = normalize_key(base_name)
@@ -221,9 +305,31 @@ def merge_layer_into_base(
     orig_dtype = base_w.dtype
 
     delta = (up @ down) * scale
-    delta = delta.reshape(base_w.shape)
-    merged = base_w.to(compute_dtype) + delta
-    base_state[layer.base_key] = merged.to(orig_dtype)
+
+    # fp8-scaled checkpoints (e.g. Krea 2's *_fp8_scaled.safetensors) store a
+    # companion "<key>_scale" tensor alongside each quantized weight. Adding a
+    # LoRA delta directly to the raw fp8 values would silently corrupt them --
+    # dequantize to full precision, merge, then requantize.
+    is_fp8 = base_w.dtype in (torch.float8_e4m3fn, torch.float8_e5m2)
+    scale_key = layer.base_key[: -len(".weight")] + ".weight_scale" if layer.base_key.endswith(".weight") else None
+    has_scale = is_fp8 and scale_key is not None and scale_key in base_state
+
+    if has_scale:
+        weight_scale = base_state[scale_key].to(compute_dtype)
+        dequantized = base_w.to(compute_dtype) * weight_scale
+        merged = dequantized + delta.reshape(dequantized.shape)
+
+        fp8_max = 448.0  # max representable magnitude of float8_e4m3fn
+        max_abs = merged.abs().max()
+        new_scale = (max_abs / fp8_max).clamp(min=1e-12)
+        requantized = (merged / new_scale).clamp(-fp8_max, fp8_max).to(orig_dtype)
+
+        base_state[layer.base_key] = requantized
+        base_state[scale_key] = new_scale.reshape(base_state[scale_key].shape).to(base_state[scale_key].dtype)
+    else:
+        delta = delta.reshape(base_w.shape)
+        merged = base_w.to(compute_dtype) + delta
+        base_state[layer.base_key] = merged.to(orig_dtype)
 
 
 def merge_lora_file(
