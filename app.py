@@ -30,6 +30,14 @@ MAX_LORAS = 8
 COMPUTE_DTYPES = ["fp32", "fp16", "bf16"]
 OUTPUT_DTYPES = list(DTYPE_MAP.keys())
 
+# Gradio moved the `css` argument from Blocks() to launch() in v6.0.
+# Passing it to the wrong one either errors or gets silently ignored,
+# depending on version, so detect which API this install uses.
+try:
+    _GRADIO_MAJOR = int(gr.__version__.split(".")[0])
+except Exception:
+    _GRADIO_MAJOR = 0  # unknown -> assume older (pre-6.0) API as the safer default
+
 CYBERPUNK_CSS = """
 /* --- CYBERPUNK HUD STYLES --- */
 :root {
@@ -111,6 +119,9 @@ h3, label, .gr-checkbox label span {
     text-transform: uppercase;
 }
 """
+
+BLOCKS_CSS_KWARGS = {"css": CYBERPUNK_CSS} if _GRADIO_MAJOR < 6 else {}
+LAUNCH_CSS_KWARGS = {"css": CYBERPUNK_CSS} if _GRADIO_MAJOR >= 6 else {}
 
 
 # --------------------------------------------------------------------------- #
@@ -245,7 +256,7 @@ def on_merge(
 # UI layout
 # --------------------------------------------------------------------------- #
 
-with gr.Blocks(title="Krea 2 Turbo LoRA Merger") as demo:
+with gr.Blocks(title="Krea 2 Turbo LoRA Merger", **BLOCKS_CSS_KWARGS) as demo:
     gr.Markdown(
         "# Krea 2 Turbo LoRA Merger\n"
         "Permanently bake one or more LoRAs into a base checkpoint. "
@@ -307,8 +318,4 @@ with gr.Blocks(title="Krea 2 Turbo LoRA Merger") as demo:
     )
 
 if __name__ == "__main__":
-    try:
-        demo.launch(inbrowser=True, css=CYBERPUNK_CSS)
-    except TypeError:
-        # Older Gradio versions (<6.0) don't accept css in launch(); fall back.
-        demo.launch(inbrowser=True)
+    demo.launch(inbrowser=True, **LAUNCH_CSS_KWARGS)
