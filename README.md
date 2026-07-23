@@ -1,21 +1,18 @@
 # Krea 2 Turbo LoRA Merger
 
+> ⚠️ **Note:** key-matching between diffusers-format LoRAs and native/AI-Toolkit
+> fp8-scaled base checkpoints has been fixed and verified against real files,
+> including fp8 dequantize/requantize handling. If you hit a 0-match report
+> on a different LoRA/base combination, please open an issue with a
+> `check_keys_full.py` dump of both files.
+
+
 A standalone, offline Gradio app that permanently merges one or more LoRA
 files into a base diffusion model checkpoint (built for Krea 2 Turbo, but
-works with any safetensors checkpoint using compatible LoRA naming). Utilises CPU or GPU for fast merging.
+works with any safetensors checkpoint using compatible LoRA naming).
 
 No internet access is required to run it — everything happens locally on
 your machine.
-
-
-***APP IS IN ACTIVE DEVELOPMENT***
-
-> ⚠️ **Known issues — actively being worked on.** LoRA key-matching currently
-> fails on some real-world checkpoint/LoRA combinations (0 layers matched).
-> I'm actively debugging this. If you hit this, please open an issue with a
-> sample of key names from your files rather than assuming it's your setup.
-
-
 
 ## Requirements
 
