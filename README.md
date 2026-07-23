@@ -6,6 +6,11 @@ works with any safetensors checkpoint using compatible LoRA naming). Utilises CP
 
 ***APP IS IN ACTIVE DEVELOPMENT***
 
+> ⚠️ **Known issues — actively being worked on.** LoRA key-matching currently
+> fails on some real-world checkpoint/LoRA combinations (0 layers matched).
+> I'm actively debugging this. If you hit this, please open an issue with a
+> sample of key names from your files rather than assuming it's your setup.
+
 No internet access is required to run it — everything happens locally on
 your machine.
 
